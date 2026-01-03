@@ -14,9 +14,12 @@ import (
 // make groups
 //assign connections to groups
 
+type TCPServer struct {
+	address  string
+	listener net.Listener
+}
+
 func StartServer(port string) error {
-	var group Group
-	group.members = make(map[net.Conn]*User)
 	address := ":" + port
 
 	listener, err := net.Listen("tcp", address)
@@ -31,45 +34,32 @@ func StartServer(port string) error {
 			continue
 		}
 
-		go handleConnection(conn, &group)
+		go handleConnection(conn)
 	}
 }
 
-func handleConnection(conn net.Conn, group *Group) {
+func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	newUser := NewUser("Adam")
-	group.AddMember(conn, newUser)
-	reader := bufio.NewReader(conn)
-	writer := bufio.NewWriter(conn)
-	defer writer.Flush()
+	var client Client
+
+	client.Conn = conn
+	client.Reader = bufio.NewReader(conn)
+	client.Writer = bufio.NewWriter(conn)
+
 	for {
-		line, err := reader.ReadString('\n')
+		msg, err := client.ReadMessage()
 		if err != nil {
 			if err == io.EOF {
 				fmt.Printf("connection ended for: %v\n", conn)
-				user, ok := group.Members[conn]
-				if !ok {
-					fmt.Println("could not find user for connection")
-					break
-				}
-				group.RemoveMember(conn)
-				fmt.Printf("removed member: %v\n", user)
-				break
+			} else {
+				fmt.Println("could not read message: ", err)
 			}
-			fmt.Println("could not read message: ", err)
+			break
 		}
-		group.relayMessage(group.Members[conn].Name + ": " + line)
+		fmt.Println(msg)
 	}
-	group.RemoveMember(conn)
 }
-func (group *Group) relayMessage(message string) {
-	group.Mu.Lock()
-	defer group.Mu.Unlock()
-	for conn := range group.Members {
-		_, err := conn.Write([]byte(message))
-		if err != nil {
-			fmt.Printf("Error sending message")
-		}
-	}
+
+func promptUsername() {
 
 }

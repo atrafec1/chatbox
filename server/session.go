@@ -5,20 +5,22 @@ package server
 
 import (
 	"net"
+	"sync"
+	"time"
 )
 
 type Session struct {
-	Connection net.Conn
-	User       User
+	id         string
+	CreatedAt  time.Time
+	LastActive time.Time
+	User       *User
+	mu         sync.RWMutex
 }
 
-func NewSession(user User, conn net.Conn) *Session {
+func NewSession(user *User, conn net.Conn) *Session {
 	return &Session{
-		Connection: conn,
 		User:       user,
+		CreatedAt:  time.Now(),
+		LastActive: time.Now(),
 	}
-	var session Session
-	session.Connection = conn
-	session.User = user
-	return &session
 }

@@ -1,4 +1,4 @@
-package client
+package server
 
 import (
 	"bufio"
@@ -12,6 +12,19 @@ type Client struct {
 	Writer *bufio.Writer
 }
 
+func NewClient(conn net.Conn) *Client {
+	return &Client{
+		Conn:   conn,
+		Reader: bufio.NewReader(conn),
+		Writer: bufio.NewWriter(conn),
+	}
+}
+
+func (c *Client) clientIOLoop() {
+	for {
+
+	}
+}
 func (c *Client) ReadMessage() (string, error) {
 	message, err := c.Reader.ReadString('\n')
 	if err != nil {
