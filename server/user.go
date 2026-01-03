@@ -1,6 +1,7 @@
-package user
+package server
 
 type User struct {
+	id   string
 	Name string
 }
 
@@ -10,6 +11,7 @@ func NewUser(name ...string) User {
 		newUser.Name = name[0]
 	}
 	newUser.Name = getRandomName()
+	return newUser
 }
 
 func getRandomName() string {
