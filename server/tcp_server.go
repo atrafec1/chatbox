@@ -1,10 +1,10 @@
 package server
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net"
+	"sync"
 )
 
 //Start listener
@@ -15,8 +15,13 @@ import (
 //assign connections to groups
 
 type TCPServer struct {
+	Sessions map[string]*Session
+	Users    map[string]*User
+	Groups   map[string]*Group
+
 	address  string
 	listener net.Listener
+	mu       sync.Mutex
 }
 
 func StartServer(port string) error {
@@ -40,11 +45,8 @@ func StartServer(port string) error {
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	var client Client
 
-	client.Conn = conn
-	client.Reader = bufio.NewReader(conn)
-	client.Writer = bufio.NewWriter(conn)
+	client := NewClient(conn)
 
 	for {
 		msg, err := client.ReadMessage()
@@ -60,6 +62,34 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
-func promptUsername() {
+func (server *TCPServer) UserExists(username string) bool {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	_, exists := server.Users[username]
+	return exists
+}
 
+func (server *TCPServer) AddUser(user *User) {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	server.Users[user.Name] = user
+}
+
+func (server *TCPServer) NewUser(name string) *User {
+	return &User{
+		Name: name,
+		id:   "randomIDForNow",
+		mu:   sync.RWMutex{},
+	}
+}
+
+func (server *TCPServer) promptUsername(client *Client) {
+	client.SendMessage("Enter your username: ")
+	if username, err := client.ReadMessage(); err == nil {
+		if server.UserExists(username) {
+			client.SendMessage("Username already exists. Try again. \n")
+			server.promptUsername(client)
+		}
+
+	}
 }
