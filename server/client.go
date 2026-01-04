@@ -34,8 +34,11 @@ func (c *Client) ReadMessage() (string, error) {
 }
 
 func (c *Client) SendMessage(msg string) error {
-	if _, err := c.Writer.WriteString(msg); err != nil {
-		return fmt.Errorf("error writing message %v ", err)
+	if _, err := c.Writer.WriteString(msg + "\n"); err != nil { // add newline so ReadLine works client-side
+		return fmt.Errorf("error writing message: %v", err)
+	}
+	if err := c.Writer.Flush(); err != nil {
+		return fmt.Errorf("error flushing message: %v", err)
 	}
 	return nil
 }

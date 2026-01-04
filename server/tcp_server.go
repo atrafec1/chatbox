@@ -58,7 +58,8 @@ func handleConnection(conn net.Conn) {
 			}
 			break
 		}
-		fmt.Println(msg)
+		fmt.Println("message:", msg)
+		client.SendMessage("thank you for your message! - server")
 	}
 }
 
