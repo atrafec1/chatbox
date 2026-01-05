@@ -5,11 +5,13 @@ import "time"
 type User struct {
 	ID        uint   `gorm:"primaryKey"`
 	Username  string `gorm:"uniqueIndex;not null"`
+	Password  string `gorm:"not null"`
 	CreatedAt time.Time
 	LastSeen  time.Time
 
 	Messages []Message `gorm:"foreignKey:UserID"`
-	Groups   []Group   `gorm:"many2many:user_groups;"`
+	Group    Group     `gorm:"foreignKey:GroupID"`
+	GroupID  uint
 }
 
 type Group struct {
@@ -17,7 +19,7 @@ type Group struct {
 	Name      string `gorm:"uniqueIndex;not null"`
 	CreatedAt time.Time
 
-	Users    []User    `gorm:"many2many:user_groups;"`
+	Users    []User    `gorm:"foreignKey:GroupID"`
 	Messages []Message `gorm:"foreignKey:GroupID"`
 }
 

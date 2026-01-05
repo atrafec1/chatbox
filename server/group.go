@@ -3,17 +3,17 @@ package server
 import "sync"
 
 type Group struct {
-	id      string
+	id      uint
 	name    string
-	members map[string]*User
+	members map[uint]*User
 	mu      sync.RWMutex
 }
 
-func newGroup(id, name string) *Group {
+func newGroup(id uint, name string) *Group {
 	return &Group{
 		id:      id,
 		name:    name,
-		members: make(map[string]*User),
+		members: make(map[uint]*User),
 	}
 }
 

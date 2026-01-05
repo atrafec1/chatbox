@@ -4,6 +4,7 @@
 package server
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -30,7 +31,8 @@ func NewSession(user *User, client *Client) *Session {
 func (s *Session) SendMsg(msg string) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if err := s.Client.SendMessage(msg); err != nil {
+	message := fmt.Sprintf("%s: %s", s.User.Name, msg)
+	if err := s.Client.SendMessage(message); err != nil {
 		return err
 	}
 	return nil

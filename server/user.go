@@ -3,7 +3,7 @@ package server
 import "sync"
 
 type User struct {
-	id   string
+	id   uint
 	Name string
 	mu   sync.RWMutex
 }

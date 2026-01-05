@@ -8,15 +8,14 @@ import (
 
 	"chatbox/database"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 // ChatServer represents the main server
 type ChatServer struct {
 	Sessions map[string]*Session
-	Users    map[string]*database.User
-	Groups   map[string]*database.Group
+	Users    map[string]*User
+	Groups   map[string]*Group
 
 	DB       *gorm.DB
 	Address  string
@@ -28,8 +27,8 @@ type ChatServer struct {
 func StartServer(port string, db *gorm.DB) error {
 	server := &ChatServer{
 		Sessions: make(map[string]*Session),
-		Users:    make(map[string]*database.User),
-		Groups:   make(map[string]*database.Group),
+		Users:    make(map[string]*User),
+		Groups:   make(map[string]*Group),
 		DB:       db,
 		Address:  ":" + port,
 	}
@@ -60,10 +59,11 @@ func (server *ChatServer) handleConnection(conn net.Conn) {
 	client := NewClient(conn)
 
 	// Prompt username
-	username := server.promptUsername(client)
-	user := server.newUser(username)
-	session := NewSession(user, client)
-
+	session, err := server.onboardUser(client)
+	if err != nil {
+		fmt.Println("could not onboard user:", err)
+		return
+	}
 	for {
 		msg, err := session.ReadMsg()
 		if err != nil {
@@ -80,59 +80,82 @@ func (server *ChatServer) handleConnection(conn net.Conn) {
 	}
 }
 
-func (s *ChatServer) newUser(username string) *User {
-	id := uuid.NewString()
-	return &User{
-		id:   id,
-		Name: username,
-	}
-}
-
-// UserExists checks if a user exists in memory or DB
-func (server *ChatServer) UserExists(username string) bool {
-	server.mu.Lock()
-	defer server.mu.Unlock()
-	_, exists := server.Users[username]
-	return exists
-}
-
-// AddUser adds a user to the server memory
-func (server *ChatServer) AddUser(user *database.User) {
-	server.mu.Lock()
-	defer server.mu.Unlock()
-	server.Users[user.Username] = user
-}
-
-//  ******  User Logic ********
-
-func (server *ChatServer) loginUser(c *Client) (*User, error) {
-	for {
-		if err := c.SendMessage("Username: "); err != nil {
-			return nil, err
-		}
-
-		username, err := c.ReadMessage()
-		if err != nil {
-			return nil, err
-		}
-
-		user := server.newUser(username)
-		return user, nil
-	}
-}
-
-func (s *ChatServer) registerUser(username string) (*database.User, error) {
-
-	user, err := database.CreateUser(s.DB, username)
+func (server *ChatServer) authenticateUser(c *Client) (*User, error) {
+	username, err := server.promptUsername(c)
 	if err != nil {
 		return nil, err
 	}
-	return user, nil
+
+	userExists, err := database.UsernameExists(server.DB, username)
+	if err != nil {
+		return nil, err
+	}
+	password, err := server.promptPassword(c)
+	if err != nil {
+		return nil, err
+	}
+
+	if !userExists {
+		return server.registerUser(c, username, password)
+	} else {
+		return server.loginUser(c, username, password)
+	}
 }
 
 func (s *ChatServer) onboardUser(client *Client) (*Session, error) {
 	if err := client.SendMessage("Welcome to chatbox!"); err != nil {
 		return nil, err
 	}
+	user, err := s.authenticateUser(client)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to authenticate user: %w", err)
+	}
+	session := NewSession(user, client)
+	session.SendMsg("Now logged in as: " + user.Name)
+	return session, nil
+}
 
+func (s *ChatServer) promptUsername(c *Client) (string, error) {
+
+	if err := c.SendMessage("Enter username: "); err != nil {
+		return "", err
+	}
+	username, err := c.ReadMessage()
+	if err != nil {
+		return "", err
+	}
+	return username, nil
+}
+
+func (s *ChatServer) promptPassword(c *Client) (string, error) {
+	if err := c.SendMessage("Password: "); err != nil {
+		return "", err
+	}
+	password, err := c.ReadMessage()
+	if err != nil {
+		return "", err
+	}
+	return password, nil
+}
+
+func (s *ChatServer) registerUser(c *Client, username, password string) (*User, error) {
+	user, err := database.RegisterUser(s.DB, username, password)
+	if err != nil {
+		return nil, err
+	}
+	return &User{
+		id:   user.ID,
+		Name: user.Username,
+	}, nil
+}
+
+func (s *ChatServer) loginUser(c *Client, username, password string) (*User, error) {
+	user, err := database.Login(s.DB, username, password)
+	if err != nil {
+		return nil, err
+	}
+	return &User{
+		id:   user.ID,
+		Name: user.Username,
+	}, nil
 }
