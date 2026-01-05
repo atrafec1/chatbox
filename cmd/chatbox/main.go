@@ -19,8 +19,8 @@ func main() {
 		log.Fatalf("failed to make db instance: %v", err)
 	}
 	defer sqlDB.Close()
-	server.StartServer("9090")
+	server.StartServer("9090", db)
 
-	log.Println("tcp server and database successfully initialized")
+	log.Println("tcp server and database successfully exited")
 
 }
