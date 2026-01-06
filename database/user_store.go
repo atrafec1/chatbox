@@ -1,6 +1,7 @@
 package database
 
 import (
+	"chatbox/domain"
 	"fmt"
 	"time"
 
@@ -45,7 +46,7 @@ func Login(db *gorm.DB, username, password string) (*User, error) {
 	}
 
 	if error := CheckPassword(user.Password, password); error != nil {
-		return nil, fmt.Errorf("invalid password")
+		return nil, domain.ErrInvalidPassword
 	}
 
 	user.LastSeen = time.Now()

@@ -3,9 +3,10 @@ package server
 import "sync"
 
 type User struct {
-	id   uint
-	Name string
-	mu   sync.RWMutex
+	id    uint
+	Name  string
+	Group *Group
+	mu    sync.RWMutex
 }
 
 func NewUser(name ...string) *User {

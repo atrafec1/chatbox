@@ -1,12 +1,14 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"sync"
 
 	"chatbox/database"
+	"chatbox/domain"
 
 	"gorm.io/gorm"
 )
@@ -81,6 +83,7 @@ func (server *ChatServer) handleConnection(conn net.Conn) {
 }
 
 func (server *ChatServer) authenticateUser(c *Client) (*User, error) {
+	var user *User
 	username, err := server.promptUsername(c)
 	if err != nil {
 		return nil, err
@@ -90,16 +93,19 @@ func (server *ChatServer) authenticateUser(c *Client) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	password, err := server.promptPassword(c)
-	if err != nil {
-		return nil, err
-	}
 
-	if !userExists {
-		return server.registerUser(c, username, password)
+	if userExists {
+		user, err = server.loginFlow(c, username)
+		if err != nil {
+			return nil, fmt.Errorf("login flow failed: %w", err)
+		}
 	} else {
-		return server.loginUser(c, username, password)
+		user, err = server.registerFlow(c, username)
+		if err != nil {
+			return nil, fmt.Errorf("registration flow failed: %w", err)
+		}
 	}
+	return user, nil
 }
 
 func (s *ChatServer) onboardUser(client *Client) (*Session, error) {
@@ -138,7 +144,7 @@ func (s *ChatServer) promptPassword(c *Client) (string, error) {
 	return password, nil
 }
 
-func (s *ChatServer) registerUser(c *Client, username, password string) (*User, error) {
+func (s *ChatServer) registerUser(username, password string) (*User, error) {
 	user, err := database.RegisterUser(s.DB, username, password)
 	if err != nil {
 		return nil, err
@@ -149,7 +155,7 @@ func (s *ChatServer) registerUser(c *Client, username, password string) (*User, 
 	}, nil
 }
 
-func (s *ChatServer) loginUser(c *Client, username, password string) (*User, error) {
+func (s *ChatServer) loginUser(username, password string) (*User, error) {
 	user, err := database.Login(s.DB, username, password)
 	if err != nil {
 		return nil, err
@@ -158,4 +164,50 @@ func (s *ChatServer) loginUser(c *Client, username, password string) (*User, err
 		id:   user.ID,
 		Name: user.Username,
 	}, nil
+}
+
+func (s *ChatServer) loginFlow(c *Client, username string) (*User, error) {
+	if err := c.SendMessage(fmt.Sprintf("Welcome back %v!", username)); err != nil {
+		return nil, err
+	}
+	for {
+		password, err := s.promptPassword(c)
+		if err != nil {
+			return nil, err
+		}
+
+		user, err := s.loginUser(username, password)
+		if err != nil {
+			if errors.Is(err, domain.ErrInvalidPassword) {
+				if err := c.SendMessage("Invalid password. Please try again."); err != nil {
+					fmt.Println("failed to send message, closing session:", err)
+					return nil, err
+				}
+				continue
+			}
+			return nil, fmt.Errorf("login failed: %w", err)
+		}
+		return user, nil
+	}
+}
+
+func (s *ChatServer) registerFlow(c *Client, username string) (*User, error) {
+	if err := c.SendMessage(fmt.Sprintf("Welcome to chatbox %v!", username)); err != nil {
+		return nil, err
+	}
+	password, err := s.promptPassword(c)
+	if err != nil {
+		return nil, err
+	}
+	user, err := s.registerUser(username, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register user: %w", err)
+	}
+	return user, nil
+}
+
+// Messaging
+
+func (s *ChatServer) saveMessage(session *Session, msg string) {
+	database.SaveMessage(s.DB, msg, session.User.id, session.User.Group.ID)
 }

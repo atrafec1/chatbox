@@ -9,7 +9,7 @@ type Group struct {
 	mu      sync.RWMutex
 }
 
-func newGroup(id uint, name string) *Group {
+func NewGroup(id uint, name string) *Group {
 	return &Group{
 		id:      id,
 		name:    name,
@@ -18,13 +18,13 @@ func newGroup(id uint, name string) *Group {
 }
 
 // unexported helpers — server only
-func (g *Group) add(u *User) {
+func (g *Group) Add(u *User) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.members[u.id] = u
 }
 
-func (g *Group) remove(u *User) {
+func (g *Group) Remove(u *User) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	delete(g.members, u.id)
