@@ -15,9 +15,9 @@ import (
 
 // ChatServer represents the main server
 type ChatServer struct {
-	Sessions map[string]*Session
-	Users    map[string]*User
-	Groups   map[string]*Group
+	Sessions map[uint]*Session
+	Users    map[uint]*User
+	Groups   map[uint]*Group
 
 	DB       *gorm.DB
 	Address  string
@@ -28,9 +28,9 @@ type ChatServer struct {
 // StartServer starts listening on the given port with the database attached
 func StartServer(port string, db *gorm.DB) error {
 	server := &ChatServer{
-		Sessions: make(map[string]*Session),
-		Users:    make(map[string]*User),
-		Groups:   make(map[string]*Group),
+		Sessions: make(map[uint]*Session),
+		Users:    make(map[uint]*User),
+		Groups:   make(map[uint]*Group),
 		DB:       db,
 		Address:  ":" + port,
 	}
@@ -150,8 +150,9 @@ func (s *ChatServer) registerUser(username, password string) (*User, error) {
 		return nil, err
 	}
 	return &User{
-		id:   user.ID,
-		Name: user.Username,
+		id:      user.ID,
+		Name:    user.Username,
+		GroupID: user.Group.ID,
 	}, nil
 }
 
@@ -161,8 +162,9 @@ func (s *ChatServer) loginUser(username, password string) (*User, error) {
 		return nil, err
 	}
 	return &User{
-		id:   user.ID,
-		Name: user.Username,
+		id:      user.ID,
+		Name:    user.Username,
+		GroupID: user.Group.ID,
 	}, nil
 }
 
@@ -209,5 +211,5 @@ func (s *ChatServer) registerFlow(c *Client, username string) (*User, error) {
 // Messaging
 
 func (s *ChatServer) saveMessage(session *Session, msg string) {
-	database.SaveMessage(s.DB, msg, session.User.id, session.User.Group.ID)
+	database.SaveMessage(s.DB, msg, session.User.id, session.User.GroupID)
 }
