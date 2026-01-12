@@ -4,13 +4,12 @@
 package server
 
 import (
-	"fmt"
 	"sync"
 	"time"
 )
 
 type Session struct {
-	id         string
+	id         uint
 	Client     *Client
 	CreatedAt  time.Time
 	LastActive time.Time
@@ -31,8 +30,7 @@ func NewSession(user *User, client *Client) *Session {
 func (s *Session) SendMsg(msg string) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	message := fmt.Sprintf("%s: %s", s.User.Name, msg)
-	if err := s.Client.SendMessage(message); err != nil {
+	if err := s.Client.SendMessage(msg); err != nil {
 		return err
 	}
 	return nil

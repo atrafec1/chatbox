@@ -18,7 +18,7 @@ type ChatServer struct {
 	Sessions map[uint]*Session
 	Users    map[uint]*User
 	Groups   map[uint]*Group
-
+	inbox    chan *Message
 	DB       *gorm.DB
 	Address  string
 	Listener net.Listener
@@ -31,6 +31,7 @@ func StartServer(port string, db *gorm.DB) error {
 		Sessions: make(map[uint]*Session),
 		Users:    make(map[uint]*User),
 		Groups:   make(map[uint]*Group),
+		inbox:    make(chan *Message),
 		DB:       db,
 		Address:  ":" + port,
 	}
@@ -42,43 +43,86 @@ func StartServer(port string, db *gorm.DB) error {
 	server.Listener = listener
 
 	fmt.Println("Server listening on", port)
-
+	go server.run()
 	for {
 		conn, err := listener.Accept()
+		fmt.Printf("Groups: %+v\n", server.Groups)
+		fmt.Printf("Group Members: %+v\n", server.Groups)
 		if err != nil {
 			fmt.Println("could not accept connection:", err)
 			continue
 		}
-
 		go server.handleConnection(conn)
 	}
 }
 
-// handleConnection manages a single client connection
+func (s *ChatServer) run() {
+	for msg := range s.inbox {
+		if err := s.routeMessage(msg); err != nil {
+			fmt.Println("route error:", err)
+		}
+	}
+}
+
 func (server *ChatServer) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	client := NewClient(conn)
 
-	// Prompt username
 	session, err := server.onboardUser(client)
 	if err != nil {
 		fmt.Println("could not onboard user:", err)
 		return
 	}
+	group, err := database.GetGroupByID(server.DB, session.User.GroupID)
+	if err != nil {
+		fmt.Println("could not get user group:", err)
+		return
+	}
+
+	// Get existing group or create once
+	memoryGroup := server.getOrCreateGroup(group.ID, group.Name)
+	memoryGroup.Add(session)
+	fmt.Printf("User %v connected and added to group %v\n", session.User.Name, group.Name)
+
+	if err := server.IOLoop(session); err != nil {
+		fmt.Println("error in IO loop:", err)
+	}
+
+	// Cleanup on disconnect
+	memoryGroup.Remove(session)
+}
+
+func (server *ChatServer) getOrCreateGroup(id uint, name string) *Group {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	if group, exists := server.Groups[id]; exists {
+		return group
+	}
+	group := NewGroup(id, name) // calls go g.distributeMessages()
+	server.Groups[id] = group
+	return group
+}
+
+func (server *ChatServer) IOLoop(s *Session) error {
 	for {
-		msg, err := session.ReadMsg()
+		msg, err := s.ReadMsg()
 		if err != nil {
 			if err == io.EOF {
-				fmt.Printf("connection ended for: %v\n", conn)
-			} else {
-				fmt.Println("could not read message: ", err)
+				fmt.Printf("connection ended for: %v\n", s.User.Name)
+				return nil
 			}
-			break
+			return fmt.Errorf("could not read message: %w", err)
 		}
 
-		fmt.Println("message:", msg)
-		session.SendMsg("wow, Nice!")
+		m := &Message{
+			GroupID:  s.User.GroupID,
+			UserID:   s.User.id,
+			Username: s.User.Name,
+			Content:  msg, // raw content, not formatted yet
+		}
+		server.saveMessage(m)
+		server.inbox <- m
 	}
 }
 
@@ -210,6 +254,26 @@ func (s *ChatServer) registerFlow(c *Client, username string) (*User, error) {
 
 // Messaging
 
-func (s *ChatServer) saveMessage(session *Session, msg string) {
-	database.SaveMessage(s.DB, msg, session.User.id, session.User.GroupID)
+func (s *ChatServer) saveMessage(m *Message) {
+	database.SaveMessage(s.DB, m.Content, m.UserID, m.GroupID)
+}
+
+func (s *ChatServer) getGroup(groupID uint) (*Group, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	group, exists := s.Groups[groupID]
+	if !exists {
+		return nil, fmt.Errorf("failed to get users group")
+	}
+	return group, nil
+}
+
+func (s *ChatServer) routeMessage(m *Message) error {
+	group, err := s.getGroup(m.GroupID)
+	if err != nil {
+		return err
+	}
+
+	group.Enqueue(m)
+	return nil
 }

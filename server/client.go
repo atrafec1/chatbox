@@ -20,11 +20,6 @@ func NewClient(conn net.Conn) *Client {
 	}
 }
 
-func (c *Client) clientIOLoop() {
-	for {
-
-	}
-}
 func (c *Client) ReadMessage() (string, error) {
 	message, err := c.Reader.ReadString('\n')
 	if err != nil {
