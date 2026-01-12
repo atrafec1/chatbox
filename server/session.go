@@ -6,10 +6,12 @@ package server
 import (
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Session struct {
-	id         uint
+	id         string
 	Client     *Client
 	CreatedAt  time.Time
 	LastActive time.Time
@@ -19,6 +21,7 @@ type Session struct {
 
 func NewSession(user *User, client *Client) *Session {
 	return &Session{
+		id:         uuid.New().String(),
 		User:       user,
 		Client:     client,
 		CreatedAt:  time.Now(),

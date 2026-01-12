@@ -9,7 +9,7 @@ type Group struct {
 	id       uint
 	name     string
 	messages chan *Message
-	members  map[uint]*Session
+	members  map[string]*Session
 
 	mu sync.RWMutex
 }
@@ -18,7 +18,7 @@ func NewGroup(id uint, name string) *Group {
 	g := &Group{
 		id:       id,
 		name:     name,
-		members:  make(map[uint]*Session),
+		members:  make(map[string]*Session),
 		messages: make(chan *Message, 128),
 	}
 	go g.distributeMessages()

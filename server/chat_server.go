@@ -46,8 +46,6 @@ func StartServer(port string, db *gorm.DB) error {
 	go server.run()
 	for {
 		conn, err := listener.Accept()
-		fmt.Printf("Groups: %+v\n", server.Groups)
-		fmt.Printf("Group Members: %+v\n", server.Groups)
 		if err != nil {
 			fmt.Println("could not accept connection:", err)
 			continue
@@ -273,7 +271,10 @@ func (s *ChatServer) routeMessage(m *Message) error {
 	if err != nil {
 		return err
 	}
-
+	for _, id := range group.members {
+		fmt.Printf("User: %v", id.User.Name)
+	}
+	fmt.Printf("Group members: %v", group.members)
 	group.Enqueue(m)
 	return nil
 }
