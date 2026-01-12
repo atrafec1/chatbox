@@ -31,8 +31,7 @@ func (g *Group) Close() {
 
 func (g *Group) distributeMessages() {
 	for msg := range g.messages {
-		formatted := fmt.Sprintf("%s: %s", msg.Username, msg.Content)
-		g.BroadcastMsg(formatted)
+		g.BroadcastMsg(msg)
 	}
 }
 
@@ -49,12 +48,15 @@ func (g *Group) Remove(s *Session) {
 	delete(g.members, s.id)
 }
 
-func (g *Group) BroadcastMsg(msg string) {
+func (g *Group) BroadcastMsg(msg *Message) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	for _, session := range g.members {
 		fmt.Printf("Sending to member %v\n", session.User.Name)
-		go session.SendMsg(msg)
+		if session.User.id == msg.UserID {
+			continue
+		}
+		go session.SendMsg(fmt.Sprintf("%s: %s", msg.Username, msg.Content))
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"strings"
 )
 
 type Client struct {
@@ -25,7 +26,7 @@ func (c *Client) ReadMessage() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error reading message: %v", err)
 	}
-	return message, nil
+	return strings.TrimRight(message, "\r\n"), nil
 }
 
 func (c *Client) SendMessage(msg string) error {
