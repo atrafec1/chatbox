@@ -17,15 +17,17 @@ type Session struct {
 	LastActive time.Time
 	User       *User
 	mu         sync.RWMutex
+	Server     *ChatServer
 }
 
-func NewSession(user *User, client *Client) *Session {
+func NewSession(server *ChatServer, user *User, client *Client) *Session {
 	return &Session{
 		id:         uuid.New().String(),
 		User:       user,
 		Client:     client,
 		CreatedAt:  time.Now(),
 		LastActive: time.Now(),
+		Server:     server,
 	}
 }
 

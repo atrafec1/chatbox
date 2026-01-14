@@ -1,12 +1,14 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"sync"
 
 	"chatbox/database"
+	"chatbox/domain"
 
 	"gorm.io/gorm"
 )
@@ -111,6 +113,10 @@ func (server *ChatServer) IOLoop(s *Session) error {
 			return fmt.Errorf("could not read message: %w", err)
 		}
 
+		if IsCommand(msg) {
+			server.handleCommand(msg, s)
+		}
+
 		m := &Message{
 			GroupID:  s.User.GroupID,
 			UserID:   s.User.id,
@@ -118,6 +124,7 @@ func (server *ChatServer) IOLoop(s *Session) error {
 			Content:  msg, // raw content, not formatted yet
 		}
 		server.saveMessage(m)
+
 		server.inbox <- m
 	}
 }
@@ -130,12 +137,31 @@ func (s *ChatServer) onboardUser(client *Client) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to authenticate user: %w", err)
 	}
-	session := NewSession(user, client)
+	session := NewSession(s, user, client)
 	session.SendMsg("Now logged in as: " + user.Name)
 	return session, nil
 }
 
 // Messaging
+func (s *ChatServer) handleCommand(raw_command string, session *Session) {
+	cmd, err := ParseCommand(raw_command)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInvalidCommandArgs):
+			session.SendMsg("invalid command arguments")
+		case errors.Is(err, domain.ErrNotEnoughArguments):
+			session.SendMsg("not enough arguments provided")
+		case errors.Is(err, domain.ErrTooManyArguments):
+			session.SendMsg("too many arguments provided")
+		default:
+			session.SendMsg(fmt.Sprintf("error: %v", err))
+		}
+		return
+	}
+	if err := session.ExecuteCommand([]string{}, cmd); err != nil {
+		session.SendMsg(fmt.Sprintf("command error: %v", err))
+	}
+}
 
 func (s *ChatServer) saveMessage(m *Message) {
 	database.SaveMessage(s.DB, m.Content, m.UserID, m.GroupID)
