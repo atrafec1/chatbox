@@ -8,4 +8,6 @@ var (
 	ErrNotCommand         = errors.New("not a command")
 	ErrNotEnoughArguments = errors.New("not enough arguments provided")
 	ErrTooManyArguments   = errors.New("too many arguments provided")
+
+	ErrGroupDoesNotExist = errors.New("group does not exist")
 )

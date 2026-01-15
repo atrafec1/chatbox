@@ -144,7 +144,7 @@ func (s *ChatServer) onboardUser(client *Client) (*Session, error) {
 
 // Messaging
 func (s *ChatServer) handleCommand(raw_command string, session *Session) {
-	cmd, err := ParseCommand(raw_command)
+	cmd, args, err := ParseCommand(raw_command)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidCommandArgs):
@@ -158,7 +158,7 @@ func (s *ChatServer) handleCommand(raw_command string, session *Session) {
 		}
 		return
 	}
-	if err := session.ExecuteCommand([]string{}, cmd); err != nil {
+	if err := session.ExecuteCommand(args, cmd); err != nil {
 		session.SendMsg(fmt.Sprintf("command error: %v", err))
 	}
 }
@@ -167,7 +167,7 @@ func (s *ChatServer) saveMessage(m *Message) {
 	database.SaveMessage(s.DB, m.Content, m.UserID, m.GroupID)
 }
 
-func (s *ChatServer) getGroup(groupID uint) (*Group, error) {
+func (s *ChatServer) getGroupByID(groupID uint) (*Group, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	group, exists := s.Groups[groupID]
@@ -177,8 +177,19 @@ func (s *ChatServer) getGroup(groupID uint) (*Group, error) {
 	return group, nil
 }
 
+func (s *ChatServer) getGroupByName(name string) (*Group, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, group := range s.Groups {
+		if name == group.name {
+			return group, nil
+		}
+	}
+	return nil, fmt.Errorf("%s: %w", name, domain.ErrGroupDoesNotExist)
+}
+
 func (s *ChatServer) routeMessage(m *Message) error {
-	group, err := s.getGroup(m.GroupID)
+	group, err := s.getGroupByID(m.GroupID)
 	if err != nil {
 		return err
 	}

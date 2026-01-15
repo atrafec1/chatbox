@@ -1,14 +1,11 @@
-User Onboarding
 
-Connection -> New Client
 
-User Auth Options: Anonymous or register/login 
+Todays Goals:
 
-Anonymous: Generate random name, no database persistence
 
-Login/ Register:
-1) Enter username  -> If username exists already (in database) we prompt login
-                    -> If no existing user we prompt register 
+Commands
 
--> Create new session with the user
+Join Group
+Leave Group
+Help
 

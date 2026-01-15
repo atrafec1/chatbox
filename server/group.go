@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -33,6 +34,21 @@ func (g *Group) distributeMessages() {
 	for msg := range g.messages {
 		g.BroadcastMsg(msg)
 	}
+}
+
+func (g *Group) ListMembers(s *Session) error {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	var membersList []string
+
+	for _, member := range g.members {
+		membersList = append(membersList, member.User.Name)
+	}
+	if err := s.SendMsg(strings.Join(membersList, ", ")); err != nil {
+		return err
+	}
+	return nil
+
 }
 
 // unexported helpers — server only

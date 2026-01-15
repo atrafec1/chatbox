@@ -22,7 +22,8 @@ func init() {
 	Commands["hello"] = hello
 	Commands["groups"] = listGroupings
 	Commands["commands"] = commands
-	Commands["join group"] = joinGroup
+	Commands["listmembers"] = CMDListGroupMembers
+	// Commands["join group"] = joinGroup
 }
 
 func IsCommand(msg string) bool {
@@ -40,10 +41,10 @@ var commands = Command{
 	MinArgs:     0,
 }
 
-func ParseCommand(command string) (*Command, error) {
+func ParseCommand(command string) (*Command, []string, error) {
 	// /join <group_name>
 	if !strings.HasPrefix(command, "/") {
-		return nil, ErrNotCommand
+		return nil, nil, ErrNotCommand
 	}
 	cmd_without_prefix := command[1:]
 	parts := strings.Split(cmd_without_prefix, " ")
@@ -53,13 +54,14 @@ func ParseCommand(command string) (*Command, error) {
 
 	cmd, exists := Commands[cmdName]
 	if !exists {
-		return nil, ErrNotCommand
+		return nil, nil, ErrNotCommand
 	}
 
 	if cmd.MinArgs > len(arguments) {
-		return nil, ErrInvalidCommandArgs
+		return nil, nil, ErrInvalidCommandArgs
 	}
-	return &cmd, nil
+	fmt.Printf("%v: arguments", arguments)
+	return &cmd, arguments, nil
 }
 
 var listGroupings = Command{
@@ -120,6 +122,26 @@ func HelloWorld(args []string, s *Session) error {
 
 func (s *Session) ExecuteCommand(args []string, cmd *Command) error {
 	if err := cmd.Handler(args, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+var CMDListGroupMembers = Command{
+	Name:        "list group members",
+	Handler:     listGroupMembers,
+	Description: "List group members given a specified group name",
+	Usage:       "/listmembers <groupname>",
+	MinArgs:     1,
+}
+
+func listGroupMembers(args []string, s *Session) error {
+	groupName := args[0]
+	group, err := s.Server.getGroupByName(groupName)
+	if err != nil {
+		return err
+	}
+	if err := group.ListMembers(s); err != nil {
 		return err
 	}
 	return nil
